@@ -6,8 +6,6 @@ LABEL maintainer="Rhys Arkins <rhys@arkins.net>"
 LABEL name="renovate"
 LABEL org.opencontainers.image.source="https://github.com/renovatebot/renovate"
 
-ENV APP_ROOT=/usr/src/app
-WORKDIR ${APP_ROOT}
 
 # required for install
 USER root
@@ -116,16 +114,6 @@ RUN rm -rf /usr/bin/python && ln /usr/bin/python3.8 /usr/bin/python
 # Pip
 
 RUN curl --silent https://bootstrap.pypa.io/get-pip.py | python
-
-# Set up ubuntu user and home directory with access to users in the root group (0)
-
-ENV HOME=/home/ubuntu
-RUN groupadd --gid 1000 ubuntu && \
-  useradd --uid 1000 --gid ubuntu --groups 0 --shell /bin/bash --home-dir ${HOME} --create-home ubuntu
-
-
-RUN chown -R ubuntu:0 ${APP_ROOT} ${HOME} && \
-  chmod -R g=u ${APP_ROOT} ${HOME}
 
 # Docker client and group
 
