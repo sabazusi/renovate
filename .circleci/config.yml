@@ -14,6 +14,13 @@ commands:
             git config --global user.name "Renovate Bot"
             git --version
 
+      - restore_cache:
+          keys:
+            - dependency-cache-v2-{{ .Branch }}-{{ checksum "yarn.lock" }}
+            - dependency-cache-v2-{{ .Branch }}-
+            - dependency-cache-v2-
+            - dependency-cache-
+
       - run:
           name: Installing Dependencies
           command: |
@@ -21,8 +28,9 @@ commands:
             pip install --user -r requirements.txt
 
       - save_cache:
-          key: dependency-cache-{{ checksum "yarn.lock" }}
+          key: dependency-cache-v2-{{ checksum "yarn.lock" }}
           paths:
+            - ~/.cache/yarn
             - ./node_modules
             - '.cache'
             - '.eslintcache'
@@ -45,7 +53,8 @@ commands:
           command: |
             yarn jest --maxWorkers=2  --ci --reporters=default --reporters=jest-junit
           environment:
-            JEST_JUNIT_OUTPUT: 'test-results/jest/results.xml'
+            JEST_JUNIT_OUTPUT_DIR: 'test-results/jest'
+            JEST_JUNIT_OUTPUT_NAME: 'results.xml'
 
       - store_test_results:
           path: test-results
@@ -73,6 +82,12 @@ jobs:
       - image: amd64/node:12.13.0@sha256:834225bc3af578aee9486fe3c5ad850a957c3c72c9f45688a9e0ce2eeee16794
     steps:
       - checkout
+      - restore_cache:
+          keys:
+            - dependency-cache-v2-{{ .Branch }}-{{ checksum "yarn.lock" }}
+            - dependency-cache-v2-{{ .Branch }}-
+            - dependency-cache-v2-
+            - dependency-cache-
       - run: yarn install --frozen-lockfile
       - run: yarn build
       - run: yarn semantic-release

@@ -1,28 +1,21 @@
 # Base image
 #============
-FROM renovate/yarn:1.19.1@sha256:aecd501c4a55b396176468506b9b9fdee3b51da065aa69c289a850e2477710f9  AS base
+FROM renovate/yarn:1.21.1@sha256:6aeeab4a40e4687a961ab8bcefb2fa4ce374c4f0324cc40d37fbcecbfac4af0c AS base
 
 LABEL maintainer="Rhys Arkins <rhys@arkins.net>"
 LABEL name="renovate"
 LABEL org.opencontainers.image.source="https://github.com/renovatebot/renovate"
 
+ENV APP_ROOT=/usr/src/app
+WORKDIR ${APP_ROOT}
+
+# required for install
 USER root
-WORKDIR /usr/src/app/
-RUN chown -R ubuntu:ubuntu /usr/src/app
-USER ubuntu
+
 
 # Build image
 #============
 FROM base as tsbuild
-
-USER root
-
-# Python 2 and make are required to build node-re2
-
-RUN apt-get update && apt-get install -y python-minimal build-essential && \
-    rm -rf /var/lib/apt/lists/*
-
-USER ubuntu
 
 COPY package.json .
 COPY yarn.lock .
@@ -35,8 +28,6 @@ COPY tsconfig.app.json tsconfig.app.json
 RUN yarn build:docker
 
 # Prune node_modules to production-only so they can be copied into the final image
-
-
 RUN yarn install --production --frozen-lockfile
 
 
@@ -44,16 +35,12 @@ RUN yarn install --production --frozen-lockfile
 #============
 FROM base as final
 
-
-# required for install
-USER root
-
 RUN apt-get update && apt-get install -y gpg curl wget unzip xz-utils git openssh-client && \
     rm -rf /var/lib/apt/lists/*
 
 ## Gradle
 
-RUN apt-get update && apt-get install -y --no-install-recommends gradle && \
+RUN apt-get update && apt-get install -y --no-install-recommends openjdk-8-jre-headless gradle && \
     rm -rf /var/lib/apt/lists/*
 
 # Erlang
@@ -97,7 +84,7 @@ RUN chmod +x /usr/local/bin/composer
 RUN apt-get update && apt-get install -y bzr mercurial && \
     rm -rf /var/lib/apt/lists/*
 
-ENV GOLANG_VERSION 1.13
+ENV GOLANG_VERSION 1.13.4
 
 # Disable GOPROXY and GOSUMDB until we offer a solid solution to configure
 # private repositories.
@@ -117,7 +104,7 @@ ENV CGO_ENABLED=0
 
 # Python
 
-RUN apt-get update && apt-get install -y python3.8-dev python3-distutils && \
+RUN apt-get update && apt-get install -y python3.8-dev python3.8-venv python3-distutils && \
     rm -rf /var/lib/apt/lists/*
 
 RUN rm -fr /usr/bin/python3 && ln /usr/bin/python3.8 /usr/bin/python3
@@ -126,6 +113,16 @@ RUN rm -rf /usr/bin/python && ln /usr/bin/python3.8 /usr/bin/python
 # Pip
 
 RUN curl --silent https://bootstrap.pypa.io/get-pip.py | python
+
+# Set up ubuntu user and home directory with access to users in the root group (0)
+
+ENV HOME=/home/ubuntu
+RUN groupadd --gid 1000 ubuntu && \
+  useradd --uid 1000 --gid ubuntu --groups 0 --shell /bin/bash --home-dir ${HOME} --create-home ubuntu
+
+
+RUN chown -R ubuntu:0 ${APP_ROOT} ${HOME} && \
+  chmod -R g=u ${APP_ROOT} ${HOME}
 
 # Docker client and group
 
@@ -144,11 +141,12 @@ USER ubuntu
 # Cargo
 
 ENV RUST_BACKTRACE=1 \
-  PATH=/home/ubuntu/.cargo/bin:$PATH
+  PATH=${HOME}/.cargo/bin:$PATH
+
+ENV RUST_VERSION=1.36.0
 
 RUN set -ex ;\
-  curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain none -y ; \
-  rustup toolchain install 1.36.0
+  curl https://sh.rustup.rs -sSf | sh -s -- --no-modify-path --profile minimal --default-toolchain ${RUST_VERSION} -y
 
 # Mix and Rebar
 
@@ -157,16 +155,18 @@ RUN mix local.rebar --force
 
 # Pipenv
 
-ENV PATH="/home/ubuntu/.local/bin:$PATH"
+ENV PATH="${HOME}/.local/bin:$PATH"
 
 RUN pip install --user pipenv
 
 # Poetry
 
-RUN curl -sSL https://raw.githubusercontent.com/sdispater/poetry/master/get-poetry.py | python
+ENV POETRY_VERSION=1.0.0
 
-ENV PATH="/home/ubuntu/.poetry/bin:$PATH"
-RUN poetry config settings.virtualenvs.create false
+RUN curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python - --version ${POETRY_VERSION}
+
+ENV PATH="${HOME}/.poetry/bin:$PATH"
+RUN poetry config virtualenvs.in-project false
 
 # Renovate
 
@@ -177,6 +177,9 @@ COPY --from=tsbuild /usr/src/app/node_modules node_modules
 COPY bin bin
 COPY data data
 
+
+# Numeric user ID for the ubuntu user. Used to indicate a non-root user to OpenShift
+USER 1000
 
 ENTRYPOINT ["node", "/usr/src/app/dist/renovate.js"]
 CMD []

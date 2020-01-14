@@ -20,7 +20,7 @@ export function parsePom(raw: string): XmlDocument | null {
   return project;
 }
 
-export function containsPlaceholder(str: string) {
+export function containsPlaceholder(str: string): boolean {
   return /\${.*?}/g.test(str);
 }
 
@@ -32,9 +32,14 @@ interface MavenProp {
 
 function depFromNode(node: XmlElement): PackageDependency | null {
   if (!node.valueWithPath) return null;
-  const groupId = node.valueWithPath('groupId');
+  let groupId = node.valueWithPath('groupId');
   const artifactId = node.valueWithPath('artifactId');
   const currentValue = node.valueWithPath('version');
+
+  if (!groupId && node.name === 'plugin') {
+    groupId = 'org.apache.maven.plugins';
+  }
+
   if (groupId && artifactId && currentValue) {
     const depName = `${groupId}:${artifactId}`;
     const versionNode = node.descendantWithPath('version');
@@ -73,7 +78,7 @@ function applyProps(
   dep: PackageDependency<Record<string, any>>,
   props: MavenProp
 ): PackageDependency<Record<string, any>> {
-  const replaceAll = (str: string) =>
+  const replaceAll = (str: string): string =>
     str.replace(/\${.*?}/g, substr => {
       const propKey = substr.slice(2, -1).trim();
       const propValue = props[propKey];

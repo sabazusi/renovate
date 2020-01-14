@@ -1,5 +1,6 @@
 import { ReleaseType } from 'semver';
 import { RangeStrategy } from '../versioning';
+import { ValidationMessage } from '../config/common';
 
 export type Result<T> = T | Promise<T>;
 
@@ -18,6 +19,7 @@ export interface ExtractConfig extends ManagerConfig {
   endpoint?: string;
   global?: any;
   gradle?: { timeout?: number };
+  aliases?: Record<string, string>;
   ignoreNpmrcFile?: boolean;
 
   skipInstalls?: boolean;
@@ -29,6 +31,7 @@ export interface UpdateArtifactsConfig extends ManagerConfig {
   compatibility?: Record<string, string>;
   cacheDir?: string;
   postUpdateOptions?: string[];
+  ignoreScripts?: boolean;
 }
 
 export interface PackageUpdateConfig {
@@ -117,10 +120,11 @@ export interface Package<T> extends ManagerData<T> {
 }
 
 export interface PackageDependency<T = Record<string, any>> extends Package<T> {
-  warnings?: { message: string }[];
+  warnings?: ValidationMessage[];
   commitMessageTopic?: string;
   currentDigestShort?: string;
   datasource?: string;
+  deprecationMessage?: string;
   digestOneAndOnly?: boolean;
   fromVersion?: string;
   lockedVersion?: string;
@@ -132,6 +136,7 @@ export interface PackageDependency<T = Record<string, any>> extends Package<T> {
   skipReason?: string;
   source?: string;
   sourceLine?: number;
+  updates?: PackageUpdateResult[];
   versionLine?: number;
 }
 
@@ -144,6 +149,7 @@ export interface Upgrade<T = Record<string, any>>
   currentVersion?: string;
   depGroup?: string;
   downloadUrl?: string;
+  localDir?: string;
   name?: string;
   newDigest?: string;
   newFrom?: string;
@@ -165,7 +171,6 @@ export interface ArtifactError {
 export interface UpdateArtifactsResult {
   artifactError?: ArtifactError;
   file?: { name: string; contents: string };
-  lockFileError?: ArtifactError;
 }
 
 export interface ManagerApi {

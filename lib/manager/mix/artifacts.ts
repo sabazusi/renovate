@@ -12,7 +12,7 @@ export async function updateArtifacts(
   newPackageFileContent: string,
   config: UpdateArtifactsConfig
 ): Promise<UpdateArtifactsResult[] | null> {
-  await logger.debug(`mix.getArtifacts(${packageFileName})`);
+  logger.debug(`mix.getArtifacts(${packageFileName})`);
   if (updatedDeps.length < 1) {
     logger.debug('No updated mix deps - returning null');
     return null;
@@ -32,7 +32,7 @@ export async function updateArtifacts(
     logger.warn({ err }, 'mix.exs could not be written');
     return [
       {
-        lockFileError: {
+        artifactError: {
           lockFile: lockFileName,
           stderr: err.message,
         },
@@ -74,7 +74,7 @@ export async function updateArtifacts(
 
     return [
       {
-        lockFileError: {
+        artifactError: {
           lockFile: lockFileName,
           stderr: err.message,
         },

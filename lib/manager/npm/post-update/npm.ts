@@ -4,6 +4,7 @@ import { getInstalledPath } from 'get-installed-path';
 import { exec } from '../../../util/exec';
 import { logger } from '../../../logger';
 import { PostUpdateConfig, Upgrade } from '../../common';
+import { SYSTEM_INSUFFICIENT_DISK_SPACE } from '../../../constants/error-messages';
 
 export interface GenerateLockFileResult {
   error?: boolean;
@@ -78,7 +79,7 @@ export async function generateLockFile(
       if (config.cacheDir) {
         volumes.push(config.cacheDir);
       }
-      cmd += volumes.map(v => `-v ${v}:${v} `).join('');
+      cmd += volumes.map(v => `-v "${v}":"${v}" `).join('');
       if (config.dockerMapDotfiles) {
         const homeDir =
           process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE;
@@ -87,7 +88,7 @@ export async function generateLockFile(
       }
       const envVars = ['NPM_CONFIG_CACHE', 'npm_config_store'];
       cmd += envVars.map(e => `-e ${e} `).join('');
-      cmd += `-w ${cwd} `;
+      cmd += `-w "${cwd}" `;
       cmd += `renovate/npm npm`;
     }
     args = `install`;
@@ -135,7 +136,7 @@ export async function generateLockFile(
     }
     // istanbul ignore if
     if (stderr && stderr.includes('ENOSPC: no space left on device')) {
-      throw new Error('disk-space');
+      throw new Error(SYSTEM_INSUFFICIENT_DISK_SPACE);
     }
     const duration = process.hrtime(startTime);
     const seconds = Math.round(duration[0] + duration[1] / 1e9);

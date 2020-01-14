@@ -16,30 +16,7 @@ import {
 } from '../../common';
 import { NpmPackage } from './common';
 import { platform } from '../../../platform';
-
-export async function extractAllPackageFiles(
-  config: ExtractConfig,
-  packageFiles: string[]
-): Promise<PackageFile[]> {
-  const npmFiles: PackageFile[] = [];
-  for (const packageFile of packageFiles) {
-    const content = await platform.getFile(packageFile);
-    if (content) {
-      const deps = await extractPackageFile(content, packageFile, config);
-      if (deps) {
-        npmFiles.push({
-          packageFile,
-          manager: 'npm',
-          ...deps,
-        });
-      }
-    } else {
-      logger.info({ packageFile }, 'packageFile has no content');
-    }
-  }
-  await postExtract(npmFiles);
-  return npmFiles;
-}
+import { CONFIG_VALIDATION } from '../../../constants/error-messages';
 
 export async function extractPackageFile(
   content: string,
@@ -62,7 +39,7 @@ export async function extractPackageFile(
     return null;
   }
   if (fileName !== 'package.json' && packageJson.renovate) {
-    const error = new Error('config-validation');
+    const error = new Error(CONFIG_VALIDATION);
     error.configFile = fileName;
     error.validationError =
       'Nested package.json must not contain renovate configuration. Please use `packageRules` with `paths` in your main config instead.';
@@ -152,7 +129,11 @@ export async function extractPackageFile(
     volta: 'volta',
   };
 
-  function extractDependency(depType: string, depName: string, input: string) {
+  function extractDependency(
+    depType: string,
+    depName: string,
+    input: string
+  ): PackageDependency {
     const dep: PackageDependency = {};
     if (!validateNpmPackageName(depName).validForOldPackages) {
       dep.skipReason = 'invalid-name';
@@ -350,7 +331,31 @@ export async function extractPackageFile(
   };
 }
 
-export async function postExtract(packageFiles: PackageFile[]) {
-  await detectMonorepos(packageFiles);
+export async function postExtract(packageFiles: PackageFile[]): Promise<void> {
+  detectMonorepos(packageFiles);
   await getLockedVersions(packageFiles);
+}
+
+export async function extractAllPackageFiles(
+  config: ExtractConfig,
+  packageFiles: string[]
+): Promise<PackageFile[]> {
+  const npmFiles: PackageFile[] = [];
+  for (const packageFile of packageFiles) {
+    const content = await platform.getFile(packageFile);
+    if (content) {
+      const deps = await extractPackageFile(content, packageFile, config);
+      if (deps) {
+        npmFiles.push({
+          packageFile,
+          manager: 'npm',
+          ...deps,
+        });
+      }
+    } else {
+      logger.info({ packageFile }, 'packageFile has no content');
+    }
+  }
+  await postExtract(npmFiles);
+  return npmFiles;
 }

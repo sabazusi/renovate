@@ -2,7 +2,7 @@ import { parse, join } from 'upath';
 import { hrtime } from 'process';
 import { outputFile, readFile } from 'fs-extra';
 import { exec } from '../../util/exec';
-import { getChildProcessEnv } from '../../util/env';
+import { getChildProcessEnv } from '../../util/exec/env';
 import { logger } from '../../logger';
 import { UpdateArtifactsConfig, UpdateArtifactsResult } from '../common';
 import { platform } from '../../platform';
@@ -13,7 +13,7 @@ export async function updateArtifacts(
   newPackageFileContent: string,
   config: UpdateArtifactsConfig
 ): Promise<UpdateArtifactsResult[] | null> {
-  await logger.debug(`poetry.updateArtifacts(${packageFileName})`);
+  logger.debug(`poetry.updateArtifacts(${packageFileName})`);
   if (updatedDeps === undefined || updatedDeps.length < 1) {
     logger.debug('No updated poetry deps - returning null');
     return null;
@@ -44,19 +44,15 @@ export async function updateArtifacts(
     const cwd = join(config.localDir, subDirectory);
     const env = getChildProcessEnv();
     let cmd: string;
-    // istanbul ignore if
     if (config.binarySource === 'docker') {
       logger.info('Running poetry via docker');
       cmd = `docker run --rm `;
-      // istanbul ignore if
       if (config.dockerUser) {
         cmd += `--user=${config.dockerUser} `;
       }
       const volumes = [cwd];
-      cmd += volumes.map(v => `-v ${v}:${v} `).join('');
-      const envVars = [];
-      cmd += envVars.map(e => `-e ${e} `);
-      cmd += `-w ${cwd} `;
+      cmd += volumes.map(v => `-v "${v}":"${v}" `).join('');
+      cmd += `-w "${cwd}" `;
       cmd += `renovate/poetry poetry`;
     } else {
       logger.info('Running poetry via global poetry');
@@ -101,7 +97,7 @@ export async function updateArtifacts(
     logger.info({ err }, `Failed to update ${lockFileName} file`);
     return [
       {
-        lockFileError: {
+        artifactError: {
           lockFile: lockFileName,
           stderr: err.message,
         },
